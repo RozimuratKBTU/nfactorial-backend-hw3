@@ -1,0 +1,79 @@
+#! /usr/bin/env node
+
+var path = require('path'),
+    _ = require('underscore');
+
+var argv = require('optimist')
+  .usage('Manipulate with the system cron jobs.\nUsage: cron-jobs ')
+  .options('i', {
+    alias:    'update-crontab',
+    describe: 'Update cron tasks (delete old, add new with [identifier])'
+  })
+  .options('w', {
+    alias:    'write-crontab',
+    describe: 'Add cron tasks (with [identifier])'
+  })
+  .options('c', {
+    alias:    'clear-crontab',
+    describe: 'Clear cron tasks (with [identifier])'
+  })
+  .options('s', {
+    alias:    'set',
+    describe: 'Set variables. Example --set \'environment=staging&path=/my/sweet/path\''
+  })
+  .options('f', {
+    alias:    'load-file',
+    describe: 'Load tasks from file',
+    default:  'cron-jobs.js'
+  })
+  .string('f')
+  .options('h', {
+    alias:    'help',
+    describe: 'Show this help message'
+  })
+  .check(function(argv) {
+    if (argv.h) {
+      throw "You want help. You get it.";
+    }
+
+    if (!argv.i && !argv.w && !argv.c) {
+      throw "Command does not have action (please provide any of these: -i / -w / -c)";
+    }
+  }).argv;
+
+var inputFile = path.resolve(process.cwd(), argv.f);
+var identifier = argv.i || argv.c || argv.w;
+
+if (identifier === true) {
+  identifier = inputFile;
+}
+
+if (argv.i) {
+  argv.c = argv.i;
+  argv.w = argv.i;
+}
+
+var CronJobs = require('..');
+var cronJobs = new CronJobs(inputFile, identifier);
+
+if (argv.s) {
+  if (!_.isArray(argv.s)) {
+    argv.s = [argv.s];
+  }
+
+  _.chain(argv.s)
+    .map(function(item) { if (item) return item.split('&'); })
+    .flatten()
+    .map(function(item) { if (item) return item.split('='); })
+    .compact()
+    .object()
+    .map(function(value, key) { return cronJobs.cron.set(key, value); });
+}
+
+if (argv.c) {
+  cronJobs.clear();
+}
+
+if (argv.w) {
+  cronJobs.add();
+}
