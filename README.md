@@ -4,10 +4,4 @@ cron-parse
 
 # Add example.html and check products.json  whill be change a few minutes will change.  
 
-Like this format :
-
-<div class="item-card__info">
-    <h2 class="item-card__name">Product 4</h2>
-    <a href="/product-4">Link to Product 4</a>
-    <span class="item-card__price">$22</span>
-</div>
+![image](https://github.com/RozimuratKBTU/nfactorial-backend-hw3/assets/122789645/c45cb7cb-ef37-4d61-8989-d5062b77a96c)
