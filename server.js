@@ -1,76 +1,69 @@
-const axios = require("axios");
-require('dotenv').config();
-const cheerio = require("cheerio");
-const express = require("express");
-const app = express();
-const fs = require("fs").promises;
+const axios = require('axios');
+const cheerio = require('cheerio');
+const fs = require('fs');
 const cron = require('node-cron');
 
-async function fetchData(filePath) {
+async function scrapeData() {
+    const url = 'https://kolesa.kz/cars/toyota/novye-avtomobili/camry/?auto-car-grbody=1&_sys-hasphoto=2&auto-custom=2';
     try {
-        const data = await fs.readFile(filePath, "utf8");
-        return cheerio.load(data);
-    } catch (error) {
-        console.error(`Error fetching data from ${filePath}:`, error);
-        throw error;
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+
+        const cars = [];
+
+        $('.a-card__info').each((i, elem) => {
+            const carTitle = $(elem).
+            find('.a-card__description').text().trim();
+            const carPrice = $(elem).
+            find('.a-card__price').text().trim();
+            const carStreet = $(elem).
+            find('.a-card__title').text().trim();
+            const carDescription = $(elem)
+                .find('.a-card__text-preview')
+                .text()
+                .trim();
+            cars.push({
+                carTitle,
+                carPrice,
+                carStreet,
+                carDescription,
+            });
+        });
+
+        return cars;
+    } catch (e) {
+        console.error('Some errors was happened');
     }
 }
 
-async function parseProduct(filePath) {
-    const $ = await fetchData(filePath);
-    const products = [];
+function readAndCompareData() {
+    let previousData = [];
+    try {
+        const data = fs.readFileSync('data.json', 'utf-8');
+        previousData = JSON.parse(data);
+    } catch (err) {
+        console.error('Error while reading a file..');
+    }
 
-    $(".item-card__info").each((index, element) => {
-        try {
-            const title = $(element)
-                .find(".item-card__name")
-                .text()
-                .trim();
-            const link = $(element).find("a").attr("href");
-            let price = $(element)
-                .find(".item-card__price")
-                .text()
-                .trim();
+    scrapeData().then((newData) => {
+        const addedData = newData.filter((e) => {
+            return !previousData.some(
+                (prevItem) => prevItem.carTitle === e.carTitle
+            );
+        });
 
-            products.push({
-                title,
-                price,
-                link,
-            });
-        } catch (error) {
-            console.error(`Error parsing product at index ${index}:`, error);
+        if (addedData.length > 0) {
+            console.log(addedData.length);
+            console.log('New data');
+            addedData.forEach((item) => console.log(item));
+            fs.writeFileSync('data.json', JSON.stringify(newData), 'utf8');
+        } else {
+            console.log('There is no new data.');
         }
     });
-
-    return products;
 }
 
-async function saveProductsToFile(products, filename) {
-    try {
-        const data = JSON.stringify(products, null, 2);
-        await fs.writeFile(filename, data, "utf8");
-        console.log(`Data saved to ${filename}`);
-    } catch (error) {
-        console.error(`Error saving data to ${filename}:`, error);
-    }
-}
-
-async function fetchAndSaveProducts() {
-    const filePath = "example.html";
-    try {
-        const products = await parseProduct(filePath);
-        await saveProductsToFile(products, "products.json");
-    } catch (error) {
-        console.error(error);
-    }
-}
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    // Start cron job only after server is running
-    cron.schedule('* * * * *', fetchAndSaveProducts);
+cron.schedule('* * * * * *', () => {
+    console.log('Start scrapping the data...');
+    readAndCompareData();
 });
-
-// Initial fetch and save
-fetchAndSaveProducts();
